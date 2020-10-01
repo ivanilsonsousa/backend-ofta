@@ -3,8 +3,16 @@ const { body, check, oneOf, validationResult } = require('express-validator');
 
 const routes = express.Router();
 
+const authMiddleware = require('./middlewares/auth');
+const LoginController = require('./controllers/LoginController');
 const PatientController = require('./controllers/PatientController');
 
+routes.get('/authenticate', authMiddleware, LoginController.isAuthenticate);
+routes.post('/begin-pass-reset', LoginController.beginPassReset);
+routes.post('/confirm-pin-reset', LoginController.confirmPinReset);
+routes.post('/reset-pass', LoginController.resetPass);
+
+routes.post('/login', LoginController.auth);
 routes.get('/patient', PatientController.index);
 
 routes.post('/patient', [

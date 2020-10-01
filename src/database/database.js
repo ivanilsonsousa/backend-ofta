@@ -1,4 +1,5 @@
 const config = require('../../knexfile');
-const knex = require('knex')(config.development);
+const promisify = require('promisify-node');
+const knex = promisify('knex')(config.development);
 
 module.exports = knex;

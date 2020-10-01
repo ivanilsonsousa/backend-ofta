@@ -5,6 +5,7 @@ const cors = require('cors');
 const port = process.env.PORT || 3333;
 const routes = require('./routes');
 const app = express();
+require('dotenv/config');
 
 app.set('trust proxy', true);
 
