@@ -50,16 +50,16 @@ module.exports = {
   async beginPassReset(req, res) {
     const { email } = req.body;
     console.log(email);
-    const user = await db.where({ email }).select().table('user');
+    const [user] = await db.where({ email }).select().table('user');
 
-    if (!user.length)
-      return res.json({ msg: "E-mail não cadastrado na base de dados" });
+    if (!user)
+      return res.json({ msg: "E-mail não cadastrado na base de dados", code: 401, type: "warning" });
 
-    // return res.json({ msg: "Te enviamos um e-mail para a recuperação de sua senha", email: user[0].email, code: 200 });
+    // return res.json({ msg: "Te enviamos um e-mail para a recuperação de sua senha", email: user.email, code: 200, type: "success" });
 
     const code = makeCode(8);
 
-    db.insert({ code, user_id: user[0].id, timestamp: Date.now() }).table('reset_password_user')
+    db.insert({ code, user_id: user.id, timestamp: Date.now() + 60 }).table('reset_password_user')
       .then((result) => {
         console.log("Dados inseridos com suceso!");
       });
@@ -74,9 +74,9 @@ module.exports = {
 
     let mailOptions = {
       from: `${process.env.TITLE_EMAIL} <${process.env.EMAIL}>`,
-      to: user[0].email,
+      to: user.email,
       subject: 'Recuperação de senha',
-      html: messageEmail(user[0].name, code)
+      html: messageEmail(user.name, code)
     };
 
     transporter.sendMail(mailOptions, (err, data) => {
@@ -84,11 +84,11 @@ module.exports = {
         console.log("::: Status: Erro ao enviar o e-mail!!!");
         console.log(err);
 
-        return res.json({ msg: "Erro ao enviar o e-mail", error: err, code: 500 });
+        return res.json({ msg: "Erro ao enviar o e-mail", error: err, code: 500, type: "error" });
       } else {
         console.log("::: Status: Email enviado com sucesso!!!");
 
-        return res.json({ msg: "Te enviamos um e-mail para a recuperação de sua senha", error: err, email: user[0].email, code: 200 });
+        return res.json({ msg: "Te enviamos um e-mail para a recuperação de sua senha", error: err, email: user.email, code: 200, type: "success" });
       }
     });
 
@@ -96,17 +96,20 @@ module.exports = {
   async confirmPinReset(req, res) {
     const { email, code } = req.body;
 
-    const regs = await db.where({ email })
+    const [regs] = await db.where({ email })
       .select()
       .table('user')
       .innerJoin("reset_password_user", "reset_password_user.user_id", "user.id")
-      .orderBy("user.id", "desc");
+      .orderBy("reset_password_user.id", "desc");
 
-    if (regs[0].code = code)
-      return res.json({ msg: "Código informado confirmado", code: 200 });
+    if (regs.code !== code)
+      return res.json({ msg: "Código informado não é válido", code: 401, type: "error" });
 
+    console.log(regs.timestamp, Date.now());
+    if (parseInt(Date.now()) > parseFloat(regs.timestamp))
+      return res.json({ msg: "Código informado expirou", code: 401, type: "error" });
 
-    console.log(regs[0]);
+    return res.json({ msg: "Código informado confirmado", code: 200 });
   },
   async resetPass(req, res) {
     const { pass, passConfirm, email } = req.body;
@@ -114,7 +117,7 @@ module.exports = {
     console.log(pass, passConfirm, email);
 
     if (pass !== passConfirm)
-      return res.json({ msg: "Senhas não combinam", code: 401 });
+      return res.json({ msg: "Senhas não combinam", code: 401, type: "error" });
 
     await db.where({ email }).update({ password: pass }).table('user');
 
