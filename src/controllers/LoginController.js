@@ -1,6 +1,7 @@
 const db = require('../database/database');
 const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
+const bcript = require('bcrypt');
 
 const authConfig = require('../config/auth.json');
 
@@ -25,16 +26,18 @@ const messageEmail = (name, code) => `
 module.exports = {
   async auth(req, res) {
     let { user, password } = req.body;
+    let pass = false;
 
     if (user)
       user = user.toLowerCase();
 
-    const login = await db.where({ user, password }).select(['id']).table('user');
+    const [login] = await db.where({ user }).select(['id', 'user', 'password']).table('user');
 
-    console.log(login)
+    if (login)
+      pass = await bcript.compare(password, login.password);
 
-    if (login === null || login.length == 0)
-      return res.json({ message: "Usuário e/ou senha incorretos ou inativo" });
+    if (login === null || login === undefined || !pass)
+      return res.json({ message: "Usuário e/ou senha incorretos ou usuário inativo", type: "warning", code: 400 });
 
     delete (login.password);
 
@@ -59,7 +62,7 @@ module.exports = {
 
     const code = makeCode(8);
 
-    db.insert({ code, user_id: user.id, timestamp: Date.now() + 60 }).table('reset_password_user')
+    db.insert({ code, user_id: user.id, timestamp: Date.now() + 86400 }).table('reset_password_user')
       .then((result) => {
         console.log("Dados inseridos com suceso!");
       });
@@ -114,12 +117,13 @@ module.exports = {
   async resetPass(req, res) {
     const { pass, passConfirm, email } = req.body;
 
-    console.log(pass, passConfirm, email);
-
     if (pass !== passConfirm)
       return res.json({ msg: "Senhas não combinam", code: 401, type: "error" });
 
-    await db.where({ email }).update({ password: pass }).table('user');
+
+    const newPass = await bcript.hash(pass, 10);
+
+    await db.where({ email }).update({ password: newPass }).table('user');
 
 
     return res.json({ msg: "Senha alterada com sucessso", code: 200 });

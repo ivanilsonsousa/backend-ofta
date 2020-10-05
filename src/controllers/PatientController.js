@@ -31,17 +31,13 @@ module.exports = {
     const { cpf, name, fone, occupation, age, gender } = req.body;
     const data = { cpf, name, fone, occupation, age, gender };
 
-    db.insert(data).into("patient")
-      .then(data => {
-        console.log(data);
-
-        return res.json(data);
-      })
-      .catch(err => {
-        console.error(err);
-
-        return res.json(err);
-      });
+    try {
+      const patient = await db.insert(data).into("patient");
+      console.log(patient);
+      return res.json(patient);
+    } catch (error) {
+      return res.json(error);
+    }
 
   },
   async destroy(req, res) {
